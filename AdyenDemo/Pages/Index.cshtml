@@ -1,0 +1,145 @@
+﻿@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Home page";
+}
+
+<script>
+
+    let paymentData = null;
+    let checkouts = [];
+    const originKey = "pub.v2.8015718132691936.aHR0cHM6Ly9sb2NhbGhvc3Q6NDQzMzk.fKmS3q3xzS-I17B2fpSB5rH-VE9ZC6S-xf-RqIibPVM";
+    function handleOnChange(state, component, element = null) {
+        state.isValid // True or false. Specifies if all the information that the shopper provided is valid.
+        state.data // Provides the data that you need to pass in the `/payments` call.
+        component // Provides the active component instance that called this event.
+
+        console.log("== handleOnChange", state.isValid, state.data);
+        if (state.isValid) {
+            $('#paymentButton').prop("disabled", false);
+            paymentData = state.data;
+        } else {
+            $('#paymentButton').prop("disabled", true);
+        }
+    }
+
+    function handlePayment(element = null) {
+        console.log('pay');
+        $.post('/api/payment',
+            {
+                PaymentMethodDetails: paymentData.paymentMethod,
+                Currency: $('#currency').val(),
+                Amount: $('#amount').val()
+            }, (data) => {
+            if (element === null) {
+                $('#result-container').text(JSON.stringify(data));
+            } else {
+                $(`#result-${element}`).text(JSON.stringify(data));
+            }
+
+
+            // handle actions
+            if (data.action) {
+                console.log('Action required');
+                
+                checkouts[element].createFromAction(data.action).mount(`#action-${element}`);
+            }
+        });
+    }
+
+    function handleOnSubmit(state, component, element = null) {
+        handlePayment(element);
+        
+        console.log(component);
+    }
+
+    function handleOnAdditionalDetails(state, component) {
+        state.data // Provides the data that you need to pass in the `/payments/details` call.
+        component // Provides the active component instance that called this event.
+
+        console.log("== handleOnAdditionalDetails", state.data);
+
+        $.post('/api/payment/details', state.data, (data) => {
+            conole.log("Success");
+            $('#result-container').text("SUCCESS");
+        });
+    }
+
+    function startPayment() {
+        let model = {
+            CountryCode: $('#country').val(),
+            CurrencyCode: $('#currency').val(),
+            Amount: $('#amount').val()
+        }
+
+        $('#accordionExample').empty();
+
+        $.getJSON('/api/paymentMethods', model, function (data) {
+            console.log(data);
+
+            for (let i = 0; i < data.paymentMethods.length; i++) {
+                $('#accordionExample').append(`
+                <div class="card">
+                    <div class="card-header" id="headingOne">
+                        <h2 class="mb-0">
+                            <button class="btn btn-link" type="button" data-toggle="collapse" data-target="#${data.paymentMethods[i].type}" aria-expanded="true" aria-controls="collapseOne">
+                                ${data.paymentMethods[i].name}
+                            </button>
+                        </h2>
+                    </div>
+
+                    <div id="${data.paymentMethods[i].type}" class="collapse" aria-labelledby="headingOne" data-parent="#accordionExample">
+                        <div class="card-body">
+                            <div id="${data.paymentMethods[i].type}"></div>
+                            <div id="action-${data.paymentMethods[i].type}"></div>
+                            <div id="result-${data.paymentMethods[i].type}"></div>
+                        </div>
+                    
+                    </div>
+                </div>`);
+
+                const configuration = {
+                    locale: "en_US",
+                    environment: "test",
+                    originKey: originKey,
+                    paymentMethodsResponse: data,
+                    onChange: handleOnChange,
+                    onAdditionalDetails: handleOnAdditionalDetails,
+                    onSubmit: () => handleOnSubmit(null, null, data.paymentMethods[i].type),
+                    showPayButton: true
+                };
+
+                checkouts[data.paymentMethods[i].type] = new AdyenCheckout(configuration);
+
+                const card = checkouts[data.paymentMethods[i].type]
+                    .create(data.paymentMethods[i].type)
+                    .mount(`#${data.paymentMethods[i].type}`);
+            }
+        });
+    }
+
+</script>
+
+<div class="text-center">
+    <form>
+        <div class="form-group">
+            <input type="text" class="form-control" id="country" placeholder="Country Code" value="NL">
+        </div>
+        <div class="form-group">
+            <div class="row">
+                <div class="col">
+                    <input type="number" class="form-control" id="amount" placeholder="Amount" value="1000">
+                </div>
+                <div class="col">
+                    <input type="text" class="form-control" id="currency" placeholder="Currency Code" value="EUR">
+                </div>
+            </div>
+        </div>
+        <button id="methodButton" type="button" class="btn btn-primary btn-block" onclick="startPayment()" >Start payment</button>
+    </form>
+
+    <div class="accordion" id="accordionExample">
+
+    </div>
+
+</div>
