@@ -19,4 +19,4 @@ The keys to Adyen account is generated for completely artificial account. You ca
 
 ## Screen
 
-![Demo screen](doc/adyen_screen.png)
+![Demo screen](AdyenDemo/doc/adyen_screen.png)
